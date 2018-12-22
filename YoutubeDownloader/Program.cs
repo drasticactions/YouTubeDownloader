@@ -42,9 +42,10 @@ namespace YoutubeDownloader
             else
                 channelUploads = await Client.GetChannelUploadsAsync(channelId);
 
-            foreach (var upload in channelUploads)
+            for (int i = 0; i < channelUploads.Count; i++)
             {
-                Console.WriteLine($"Video: {upload.Title}");
+                YoutubeExplode.Models.Video upload = channelUploads[i];
+                Console.WriteLine($"Video {i + 1} of {channelUploads.Count}: {upload.Title}");
                 await Converter.DownloadVideoAsync(upload.Id, $"{directory}\\{upload.Id}.mp4", ProgressBar);
             }
         }
