@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "YoutubeDownloader": {
+      "commandName": "Project",
+      "commandLineArgs": "--channel-id UC2zerzuah6pDTkCmd-WHhhg"
+    }
+  }
+}
