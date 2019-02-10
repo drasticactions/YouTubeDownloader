@@ -2,7 +2,7 @@
   "profiles": {
     "YoutubeDownloader": {
       "commandName": "Project",
-      "commandLineArgs": "--playlist-id OLAK5uy_m3RXe0DraUccYf4fPF6NTF8ocgVudp4Xc --audio --youtube-music"
+      "commandLineArgs": "--channel-id UClB6abVNH2CjhX2KT5UOoMw --captions"
     }
   }
 }

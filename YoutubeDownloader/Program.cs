@@ -1,10 +1,13 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using YoutubeExplode;
 using YoutubeExplode.Converter;
+using YoutubeExplode.Models.ClosedCaptions;
 using YoutubeExplode.Models.MediaStreams;
 
 namespace YoutubeDownloader
@@ -14,7 +17,10 @@ namespace YoutubeDownloader
         static YoutubeClient Client = new YoutubeClient();
         static YoutubeConverter Converter;
         static Progress<double> ProgressBar = new Progress<double>();
-        static async Task Main(string username = "", string channelId = "", string playlistId = "", string directory = "", string ffmpegPath = "", bool audio = false, bool youtubeMusic = false, int maxPage = 0)
+        static async Task Main(string username = "",
+            string channelId = "",
+            string playlistId = "",
+            string directory = "", string ffmpegPath = "", bool audio = false, bool youtubeMusic = false, bool captions = false, int maxPage = 0)
         {
             if (string.IsNullOrEmpty(ffmpegPath))
                 Converter = new YoutubeConverter(Client);
@@ -23,7 +29,10 @@ namespace YoutubeDownloader
 
             ProgressBar.ProgressChanged += ProgressBar_ProgressChanged;
 
-            if (!string.IsNullOrEmpty(playlistId))
+
+            if (captions)
+                await GetCaptionsAsync(directory, maxPage, username, channelId, playlistId);
+            else if (!string.IsNullOrEmpty(playlistId))
                 await GetPlaylistAsync(directory, maxPage, playlistId, audio, youtubeMusic);
             else
                 await GetChannelAsync(directory, maxPage, username, channelId, audio, youtubeMusic);
@@ -32,6 +41,56 @@ namespace YoutubeDownloader
         private static void ProgressBar_ProgressChanged(object sender, double e)
         {
             Console.Write($"\rDownloaded: {(int)(e * 100)}%");
+        }
+
+        private static async Task GetCaptionsAsync(string directory, int maxPage, string username = "", string channelId = "", string playlistId = "")
+        {
+            List<YoutubeExplode.Models.Video> videos = new List<YoutubeExplode.Models.Video>();
+            var captionsId = "";
+            if (!string.IsNullOrEmpty(playlistId))
+            {
+                var playlist = await Client.GetPlaylistAsync(playlistId);
+                videos.AddRange(playlist.Videos);
+                captionsId = playlist.Id;
+            }
+            else if (!string.IsNullOrEmpty(username) || !string.IsNullOrEmpty(channelId)) {
+                if (!string.IsNullOrEmpty(username))
+                    channelId = await Client.GetChannelIdAsync(username);
+                System.Collections.Generic.IReadOnlyList<YoutubeExplode.Models.Video> channelUploads;
+                if (maxPage > 0)
+                    channelUploads = await Client.GetChannelUploadsAsync(channelId, maxPage);
+                else
+                    channelUploads = await Client.GetChannelUploadsAsync(channelId);
+                videos.AddRange(channelUploads);
+                captionsId = channelId;
+            }
+
+            List<CaptionVideo> captionVideos = new List<CaptionVideo>();
+            var captionsMissing = 0;
+            for (int i = 0; i < videos.Count; i++)
+            {
+                YoutubeExplode.Models.Video upload = videos[i];
+                var trackInfos = await Client.GetVideoClosedCaptionTrackInfosAsync(upload.Id);
+                if (!trackInfos.Any()) {
+                    Console.WriteLine($"{i}: {upload.Title} ({upload.Id}) captions missing!");
+                    captionsMissing = captionsMissing + 1;
+                    continue;
+                }
+                var captionVid = new CaptionVideo() { VideoId = upload.Id, VideoTitle = upload.Title, VideoDuration = upload.Duration };
+                Console.WriteLine($"{i}: {upload.Title} ({upload.Id})");
+                foreach (var trackInfo in trackInfos)
+                {
+                    Console.WriteLine($"{trackInfo.Language}");
+                    var track = await Client.GetClosedCaptionTrackAsync(trackInfo);
+                    captionVid.Tracks.Add(track);
+                }
+
+                captionVideos.Add(captionVid);
+            }
+            Console.WriteLine($"Total Videos: {videos.Count}");
+            Console.WriteLine($"Total Captions: {captionVideos.Count}");
+            Console.WriteLine($"Captions Missing: {captionsMissing}");
+            File.WriteAllText($"{captionsId}-captions.txt", JsonConvert.SerializeObject(captionVideos, Formatting.Indented));
         }
 
         private static async Task GetPlaylistAsync(string directory, int maxPage, string playlistId = "", bool audio = false, bool youtubeMusic = false)
@@ -111,6 +170,17 @@ namespace YoutubeDownloader
                 tfile.Save();
                 //tfile.Tag.Pictures = new TagLib.IPicture[1] { new TagLib.Picture() };
             }
+        }
+
+        public class CaptionVideo
+        {
+            public string VideoId { get; set; }
+
+            public string VideoTitle { get; set; }
+
+            public TimeSpan VideoDuration { get; set; }
+
+            public List<ClosedCaptionTrack> Tracks { get; set; } = new List<ClosedCaptionTrack>();
         }
     }
 }
