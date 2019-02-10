@@ -66,17 +66,19 @@ namespace YoutubeDownloader
             }
 
             List<CaptionVideo> captionVideos = new List<CaptionVideo>();
-            var captionsMissing = 0;
             for (int i = 0; i < videos.Count; i++)
             {
                 YoutubeExplode.Models.Video upload = videos[i];
                 var trackInfos = await Client.GetVideoClosedCaptionTrackInfosAsync(upload.Id);
-                if (!trackInfos.Any()) {
-                    Console.WriteLine($"{i}: {upload.Title} ({upload.Id}) captions missing!");
-                    captionsMissing = captionsMissing + 1;
-                    continue;
-                }
-                var captionVid = new CaptionVideo() { VideoId = upload.Id, VideoTitle = upload.Title, VideoDuration = upload.Duration };
+                var captionVid = new CaptionVideo() { VideoId = 
+                    upload.Id, VideoTitle = upload.Title,
+                    UploadDate = upload.UploadDate,
+                    VideoDuration = upload.Duration,
+                    DislikeCount = upload.Statistics.DislikeCount,
+                    LikeCount = upload.Statistics.LikeCount,
+                    AverageRating = upload.Statistics.AverageRating,
+                    ViewCount = upload.Statistics.ViewCount,
+                };
                 Console.WriteLine($"{i}: {upload.Title} ({upload.Id})");
                 foreach (var trackInfo in trackInfos)
                 {
@@ -88,8 +90,7 @@ namespace YoutubeDownloader
                 captionVideos.Add(captionVid);
             }
             Console.WriteLine($"Total Videos: {videos.Count}");
-            Console.WriteLine($"Total Captions: {captionVideos.Count}");
-            Console.WriteLine($"Captions Missing: {captionsMissing}");
+            Console.WriteLine($"Captions Missing: {videos.Count - captionVideos.Count}");
             File.WriteAllText($"{captionsId}-captions.txt", JsonConvert.SerializeObject(captionVideos, Formatting.Indented));
         }
 
@@ -178,9 +179,15 @@ namespace YoutubeDownloader
 
             public string VideoTitle { get; set; }
 
+            public DateTimeOffset UploadDate { get; set; }
+
             public TimeSpan VideoDuration { get; set; }
 
             public List<ClosedCaptionTrack> Tracks { get; set; } = new List<ClosedCaptionTrack>();
+            public long DislikeCount { get; internal set; }
+            public long LikeCount { get; internal set; }
+            public double AverageRating { get; internal set; }
+            public long ViewCount { get; internal set; }
         }
     }
 }
